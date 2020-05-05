@@ -1,0 +1,23 @@
+{
+  "manifest_version": 2,
+  "name": "测试异步非阻塞",
+  "version": "1.0",
+  "description": "测试异步非阻塞",
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.baidu.com/"
+      ],
+      "js": [
+        "js/count.js",
+        "js/httpRequest.js",
+        "js/asyncHttpRequest.js"
+      ]
+    }
+  ],
+  "permissions": [
+    "tabs",
+    "http://*/*",
+    "https://*/*"
+  ]
+}

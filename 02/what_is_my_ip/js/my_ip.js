@@ -8,7 +8,7 @@ function httpRequest(url, callback) {
   }
   xhr.send()
 }
-httpRequest('http://freeapi.ipip.net/115.239.100.170', function(ip) {
+httpRequest('http://freeapi.ipip.net/14.215.177.39', function(ip) {
   document.getElementById("ip_div").innerText = ip
 })
 var num = 0

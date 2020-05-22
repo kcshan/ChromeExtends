@@ -360,9 +360,217 @@ setInterval(function() {
 ```
 
 #### 2.4 带扩展页面的扩展
+[16/daily API](https://openweathermap.org/forecast16)
 
+manifest.json
+``` json
+{
+  "manifest_version": 2,
+  "name": "天气预报",
+  "version": "1.0",
+  "description": "查看未来两周的天气情况",
+  "icons": {
+      "16": "images/icon16.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+  },
+  "browser_action": {
+      "default_icon": {
+          "19": "images/icon19.png",
+          "38": "images/icon38.png"
+      },
+      "default_title": "天气预报",
+      "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "permissions": [
+      "https://samples.openweathermap.org/data/2.5/forecast?q=*"
+  ]
+}
+```
+
+options.html
+``` html
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <title>设定城市</title>
+    </head>
+    <body>
+        <input type="text" id="cityId" />
+        <input type="button" id="save" value="保存" />
+        <script src="js/options.js"></script>
+    </body>
+</html>
+```
+
+js/options.js
+``` javascript
+var cityId = localStorage.cityId;
+cityId = cityId?cityId:'524901';
+document.getElementById('cityId').value = cityId;
+document.getElementById('save').onclick = function(){
+    localStorage.city = document.getElementById('cityId').value;
+    alert('保存成功。');
+}
+```
+
+popup.html
+``` html
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <style>
+  * {
+      margin: 0;
+      padding: 0;
+  }
+
+  body {
+      width: 520px;
+      height: 270px;
+  }
+
+  table {
+      font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
+      font-size: 12px;
+      width: 480px;
+      text-align: left;
+      border-collapse: collapse;
+      border: 1px solid #69c;
+      margin: 20px;
+      cursor: default;
+
+  }
+
+  table th {
+      font-weight: normal;
+      font-size: 14px;
+      color: #039;
+      border-bottom: 1px dashed #69c;
+      padding: 12px 17px;
+      white-space: nowrap;
+  }
+
+  table td {
+      color: #669;
+      padding: 7px 17px;
+      white-space: nowrap;
+  }
+
+  table tbody tr:hover td {
+      color: #339;
+      background: #d0dafd;
+  }
+
+  </style>
+  </head>
+  <body>
+  <div id="weather">载入中……</div>
+  <script src="js/weather.js"></script>
+  </body>
+  </html>
+```
+
+js/weather.js
+``` javascript
+function httpRequest(url, callback){
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", url, true);
+  xhr.onreadystatechange = function() {
+      if (xhr.readyState == 4) {
+          callback(xhr.responseText);
+      }
+  }
+  xhr.send();
+}
+
+function showWeather(result){
+  result = JSON.parse(result);
+  var list = result.list;
+  var table = '<table><tr><th>日期</th><th>天气</th><th>最低温度</th><th>最高温度</th></tr>';
+  for(var i in list){
+      var d = new Date(list[i].dt*1000);
+      table += '<tr>';
+      table += '<td>'+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'</td>';
+      table += '<td>'+list[i].weather[0].description+'</td>';
+      table += '<td>'+Math.round(list[i].temp.min-273.15)+' °C</td>';
+      table += '<td>'+Math.round(list[i].temp.max-273.15)+' °C</td>';
+      table += '</tr>';
+  }
+  table += '</table>';
+  document.getElementById('weather').innerHTML = table;
+}
+
+var cityId = localStorage.cityId;
+cityId = cityId?cityId:'524901';
+var url = 'https://samples.openweathermap.org/data/2.5/forecast/daily?id='+cityId+'&lang=zh_cn&appid=b1b15e88fa797225412429c1c50c122a1';
+httpRequest(url, showWeather);
+```
 
 #### 2.5 扩展页面间的通信
+Chrome提供了4个有关扩展页面间相互通信的接口，分别是
+- runtime.sendMessage
+- runtime.onMessage
+- runtion.connect
+- runtion.onConnect
+  
+这里只讲runtime.sendMessage和runtime.onMessage，runtion.connect和runtion.onConnect自己查[文档](http://developer.chrome.com/extensions/extension)
+
+Chrome提供的大部分API是不支持在content_scripts中运行的，但runtime.sendMessage和runtime.onMessage可以在content_scripts中运行，所以扩展的其他页面也可以同content_scripts相互通信
+- runtime.sendMessage完整的方法为：
+chorme.runtime.sendMessage(extensionId, message, options, callback)
+其中，extensionId为所发送消息的目标扩展，如果不指定这个值，则默认为发起此消息的扩展本身；message为要发生的内容，类型随意，内容随意，比如可以是'hello', 也可以是{action: 'play'、2013和[1, 2, 3]等等；options为对象类型，包含了一个值为布尔类型的includeTisChannelId属性，此属性仅在扩展和网页间通信时才会用到，它的值决定了扩展发起此消息时，是否要将TLS通信ID发生给监听此消息的外部扩展。这是有关加强用户连接安全性的技术，不是必须掌握的，options时一个可选参数；callback是回调函数，用于接收返回结果，同样是一个可选参数。
+
+- runtime.onMessage完整的方法为：
+chorme.runtime.onMessage.addListener(callback)
+此处的callback为必选参数，为回调函数。callback接收到的参数有3个，分别是message、sender和sendResponse，即消息内容、消息发送者相关信息和相应函数。其中sender对象包含4个属性，分别是：
+- tab
+- id
+- url
+- tisChannelId
+  
+tab是发起消息的标签, 后面会讲到
+
+manifest.json
+``` json
+{
+  "manifest_version": 2,
+  "name": "扩展内部通信Demo",
+  "version": "1.0",
+  "description": "扩展内部通信Demo",
+  "browser_action": {
+      "default_popup": "popup.html"
+  },
+  "background": {
+      "scripts": [
+          "js/background.js"
+      ]
+  }
+}
+```
+
+popup.html
+``` html
+<script src="js/popup.js"></script>
+```
+
+js/popup.js
+``` javascript
+chrome.runtime.sendMessage('Hello', function(response){
+  document.write(response);
+});
+```
+
+js/background.js
+``` javascript
+chrome.runtime.onMessage.addListener(function(message, sender, sendResponse){
+  if(message == 'Hello'){
+      sendResponse('Hello from background.');
+  }
+});
+```
+
 #### 2.6 存储数据
 #### 2.7 i8n
 
